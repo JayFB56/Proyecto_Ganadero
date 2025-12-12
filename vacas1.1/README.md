@@ -68,7 +68,7 @@
   - `registros` (array con objetos: `codigo_vaca`, `nombre_vaca`, `peso_lb`, `fecha_hora`, `timestamp`)
   - `wifi_activo`, `total_registros`, `fecha_servidor` y el array `registros`.
 
-> A continuación te doy **6** captions detalladas (una línea + 1–2 oraciones). Tú tienes 4 imágenes, así que asigna la que mejor corresponda; si hay screenshots combinadas, pega la caption correspondiente. Cada caption está en español y lista lo que mostrar y un breve comentario de funcionamiento preliminar.
+
 
 1. **Vista general del sistema — Menú principal.**
    <img width="744" height="590" alt="image" src="https://github.com/user-attachments/assets/48405f69-e67b-4651-ad36-c74d18c90a34" />
@@ -115,6 +115,7 @@
 
 
 ---
+
 
 
 
