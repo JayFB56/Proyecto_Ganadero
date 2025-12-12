@@ -66,6 +66,35 @@
   - `total_registros` (int)
   - `fecha_servidor` (string, generada por `millis()`)
   - `registros` (array con objetos: `codigo_vaca`, `nombre_vaca`, `peso_lb`, `fecha_hora`, `timestamp`)
+  - `wifi_activo`, `total_registros`, `fecha_servidor` y el array `registros`.
+
+> A continuación te doy **6** captions detalladas (una línea + 1–2 oraciones). Tú tienes 4 imágenes, así que asigna la que mejor corresponda; si hay screenshots combinadas, pega la caption correspondiente. Cada caption está en español y lista lo que mostrar y un breve comentario de funcionamiento preliminar.
+
+1. **Vista general del sistema — Menú principal.**
+   <img width="744" height="590" alt="image" src="https://github.com/user-attachments/assets/48405f69-e67b-4651-ad36-c74d18c90a34" />
+   *Descripción:* Interfaz mostrada por el ESP32 vía Serial: instrucciones de uso, códigos de vacas disponibles y estado del Wi-Fi. Sirve como guía rápida para operar el prototipo (ingresar código, registrar peso, activar Wi-Fi).
+
+2. **Simulación de vacas (placeholders).**
+   <img width="548" height="325" alt="image" src="https://github.com/user-attachments/assets/3800bb1f-207b-43d0-a785-722f8163cf0d" />
+   *Descripción:* Visualización de las vacas usadas solo para simular la operación. **Importante:** estas vacas son elementos de prueba y **no estarán** en el código/producto final; su propósito es validar la lógica de selección y registro.
+
+3. **Registro de leche/peso en curso (entrada por teclado).**
+   <img width="504" height="709" alt="image" src="https://github.com/user-attachments/assets/9ffa9ad1-ebcf-4582-97f2-7066d6cb74a8" />
+   *Descripción:* Pantalla/Serial mostrando la entrada del peso (ej: `1250.5`) y la confirmación de guardado. Muestra el flujo: ingresar código → `#` buscar → ingresar peso → `*` guardar.
+
+4. **Listado de todos los registros (Serial).**
+   <img width="669" height="753" alt="image" src="https://github.com/user-attachments/assets/dcf73e22-5405-442f-800d-d109f714aa32" />
+   *Descripción:* Salida por Serial con todos los registros guardados: nombre de la vaca, código, peso y hora aproximada. Esta vista confirma que los registros se acumulan localmente y pueden listarse desde la consola.
+
+5. **Consulta JSON desde un dispositivo (http://192.168.4.1/data).**
+   <img width="336" height="719" alt="image" src="https://github.com/user-attachments/assets/3f2d4cb0-d581-4cba-9dc2-179d6622beae" />
+   *Descripción:* Respuesta JSON del endpoint `/data` cuando el ESP32 está en modo AP. Útil para integrar apps móviles/web que consuman los registros. Contiene
+
+
+6. **Borrado de registros (confirmación).**
+   <img width="650" height="461" alt="image" src="https://github.com/user-attachments/assets/a8657ba9-94f0-4b8c-aad9-93ae12d78160" />
+   *Descripción:* Mensaje de confirmación para borrar todos los registros (operación con doble confirmación para evitar borrados accidentales). Después del borrado, la EEPROM se actualiza y el conteo queda a cero.
+
 
 **Ejemplo (parcial):**
 ```json
@@ -87,26 +116,7 @@
 
 ---
 
-# Leyendas (captions) sugeridas — pega **debajo de cada imagen**:
 
-> A continuación te doy **6** captions detalladas (una línea + 1–2 oraciones). Tú tienes 4 imágenes, así que asigna la que mejor corresponda; si hay screenshots combinadas, pega la caption correspondiente. Cada caption está en español y lista lo que mostrar y un breve comentario de funcionamiento preliminar.
 
-1. **Vista general del sistema — Menú principal.**  
-   *Descripción:* Interfaz mostrada por el ESP32 vía Serial: instrucciones de uso, códigos de vacas disponibles y estado del Wi-Fi. Sirve como guía rápida para operar el prototipo (ingresar código, registrar peso, activar Wi-Fi).
-
-2. **Simulación de vacas (placeholders).**  
-   *Descripción:* Visualización de las vacas usadas solo para simular la operación. **Importante:** estas vacas son elementos de prueba y **no estarán** en el código/producto final; su propósito es validar la lógica de selección y registro.
-
-3. **Registro de leche/peso en curso (entrada por teclado).**  
-   *Descripción:* Pantalla/Serial mostrando la entrada del peso (ej: `1250.5`) y la confirmación de guardado. Muestra el flujo: ingresar código → `#` buscar → ingresar peso → `*` guardar.
-
-4. **Listado de todos los registros (Serial).**  
-   *Descripción:* Salida por Serial con todos los registros guardados: nombre de la vaca, código, peso y hora aproximada. Esta vista confirma que los registros se acumulan localmente y pueden listarse desde la consola.
-
-5. **Consulta JSON desde un dispositivo (http://192.168.4.1/data).**  
-   *Descripción:* Respuesta JSON del endpoint `/data` cuando el ESP32 está en modo AP. Útil para integrar apps móviles/web que consuman los registros. Contiene `wifi_activo`, `total_registros`, `fecha_servidor` y el array `registros`.
-
-6. **Borrado de registros (confirmación).**  
-   *Descripción:* Mensaje de confirmación para borrar todos los registros (operación con doble confirmación para evitar borrados accidentales). Después del borrado, la EEPROM se actualiza y el conteo queda a cero.
 
 
