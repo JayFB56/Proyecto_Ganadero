@@ -69,44 +69,46 @@
   - `wifi_activo`, `total_registros`, `fecha_servidor` y el array `registros`.
 
 ### **1. Vista general del sistema — Menú principal**
-<img width="480" alt="image" src="https://github.com/user-attachments/assets/48405f69-e67b-4651-ad36-c74d18c90a34" />
+<img width="350" alt="image" src="https://github.com/user-attachments/assets/48405f69-e67b-4651-ad36-c74d18c90a34" />
 
-*Descripción:* Interfaz mostrada por el ESP32 vía Serial: instrucciones, códigos disponibles y estado del Wi-Fi.
+**Descripción:** Interfaz mostrada por el ESP32 vía Serial: instrucciones, códigos disponibles y estado del Wi-Fi.
 
 ---
 
 ### **2. Simulación de vacas (placeholders)**
-<img width="380" alt="image" src="https://github.com/user-attachments/assets/3800bb1f-207b-43d0-a785-722f8163cf0d" />
+<img width="280" alt="image" src="https://github.com/user-attachments/assets/3800bb1f-207b-43d0-a785-722f8163cf0d" />
 
-*Descripción:* Estas vacas son únicamente simulaciones para pruebas. No forman parte del sistema final.
+**Descripción:** Estas vacas son solo simulaciones para validar la lógica. No forman parte del producto final.
 
 ---
 
 ### **3. Registro de leche/peso en curso**
-<img width="340" alt="image" src="https://github.com/user-attachments/assets/9ffa9ad1-ebcf-4582-97f2-7066d6cb74a8" />
+<img width="260" alt="image" src="https://github.com/user-attachments/assets/9ffa9ad1-ebcf-4582-97f2-7066d6cb74a8" />
 
-*Descripción:* Muestra el flujo: ingresar código → `#` → ingresar peso → `*` guardar.
+**Descripción:** Flujo de registro: código → `#` → peso → `*` guardar.
 
 ---
 
 ### **4. Listado de todos los registros (Serial)**
-<img width="420" alt="image" src="https://github.com/user-attachments/assets/dcf73e22-5405-442f-800d-d109f714aa32" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/dcf73e22-5405-442f-800d-d109f714aa32" />
 
-*Descripción:* Lista completa de registros almacenados en EEPROM.
+**Descripción:** Vista completa de los registros almacenados en EEPROM: código, nombre, peso y hora.
 
 ---
 
 ### **5. Consulta JSON desde un dispositivo**
-<img width="300" alt="image" src="https://github.com/user-attachments/assets/3f2d4cb0-d581-4cba-9dc2-179d6622beae" />
+<img width="240" alt="image" src="https://github.com/user-attachments/assets/3f2d4cb0-d581-4cba-9dc2-179d6622beae" />
 
-*Descripción:* Salida JSON del endpoint `/data` vía Wi-Fi AP.
+**Descripción:** Respuesta del endpoint `/data` al conectarse mediante el AP del ESP32.
 
 ---
 
 ### **6. Borrado de registros (confirmación)**
-<img width="420" alt="image" src="https://github.com/user-attachments/assets/a8657ba9-94f0-4b8c-aad9-93ae12d78160" />
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/a8657ba9-94f0-4b8c-aad9-93ae12d78160" />
 
-*Descripción:* Confirmación para borrar todos los registros.
+**Descripción:** Confirmación para borrar todos los registros almacenados.
+
+
 
 **Ejemplo (parcial):**
 ```json
@@ -127,6 +129,7 @@
 
 
 ---
+
 
 
 
