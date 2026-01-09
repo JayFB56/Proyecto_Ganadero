@@ -1,4 +1,4 @@
-# Sistema de Pesaje ESP32 con Servidor de Datos
+# Sistema de Pesaje con Servidor de Datos
 
 Este proyecto implementa una balanza inteligente utilizando un **ESP32**, que integra múltiples periféricos para la gestión de pesaje, visualización y almacenamiento de datos con capacidad de descarga inalámbrica.
 
@@ -13,20 +13,18 @@ Este proyecto implementa una balanza inteligente utilizando un **ESP32**, que in
 
 ##  Conectividad y Descarga de Datos
 
-El sistema actúa como un punto de acceso (Access Point), permitiendo recuperar los registros almacenados sin necesidad de una red externa.
+El sistema actúa como un punto de acceso (Access Point), permitiendo descargar los datos desde la app los registros almacenados sin necesidad de una red externa.
 
 1.  **Red Wi-Fi (SSID):** `Balanza`
 2.  **Contraseña:** `12345678`
 3.  **Acceso Web:** Navega a la IP `192.168.4.1/data`
 
-Al acceder a la dirección indicada, el dispositivo iniciará la descarga automática de un archivo llamado **`data.csv`**, el cual contiene el historial completo de todos los registros realizados hasta la fecha.
+Al acceder a la app movil se vera un boton que hara la descarga automática de un archivo llamado **`data.csv`**, el cual contiene el historial completo de todos los registros realizados hasta la fecha.
 
 ##  Formato de Exportación
 
 Los datos se exportan en formato **CSV**, compatible con Excel, Google Sheets y otras herramientas de análisis:
 
 *   **Nombre del archivo:** `data.csv`
-*   **Contenido:** Registros cronológicos de pesaje incluyendo fecha y hora del RTC.
-
----
-*Desarrollado para ESP32.*
+*   **Contenido:** Se guarda el código de vaca, peso, fecha, hora, turno(am/pm).
+   **Ejemplo:** `23,4.20,8/1/2026,4:17,AM`
