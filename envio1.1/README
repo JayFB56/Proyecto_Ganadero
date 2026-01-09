@@ -1,0 +1,9 @@
+Código de para el esp32 donde tendra conectado:
+Pantalla Oled
+Celda de Carga
+Buzzer
+Led-2
+Reloj "RTC"
+Matriz 4x4
+Permite el envio de datos cuando se conecta a la red creada por el esp32 ("Balanza", "12345678") 
+mediante la ip 192.168.4.1/data descargara los registro en un formato CSV "data.csv" que tendra el todos los registros hechos hasta la fecha.
