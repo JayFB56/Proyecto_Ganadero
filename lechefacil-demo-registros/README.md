@@ -43,5 +43,3 @@ adb connect <ip>:<connectPort>
 adb devices   # should show <ip>:port device
 ```
 4) Run `yarn mobile:run:android` and pick the device when prompted.
-
-Tip: if you need to reset USB auth, toggle USB debugging off/on and accept the RSA prompt, then repeat pairing.
