@@ -24,10 +24,9 @@ npm run build
 
 Sync and run:
 ```sh
-yarn mobile:run:android   # or npm run mobile:run:android
+npm run mobile:run:android   # or yarn mobile:run:android
 ```
 
-Check you have installed Java 21 with: `java -version`
 
 ## Connect a physical Android device over Wi‑Fi (pairing code)
 1) On the phone: enable Developer Options → Wireless debugging → Pair device with pairing code. Note IP:pairingPort and the 6‑digit code.  
@@ -45,3 +44,6 @@ adb devices   # should show <ip>:port device
 4) Run `yarn mobile:run:android` and pick the device when prompted.
 
 Tip: if you need to reset USB auth, toggle USB debugging off/on and accept the RSA prompt, then repeat pairing.
+
+# Capture of app web 
+
