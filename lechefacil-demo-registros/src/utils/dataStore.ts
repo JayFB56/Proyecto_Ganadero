@@ -1,20 +1,30 @@
 import { Registro } from "../components/RegistroTable";
-import { getAllRecords, addRecords } from "./db";
+import storage from "../core/storage";
 
-// load all registros from IndexedDB
+// load all registros from persistent storage (source of truth)
 export async function loadRecords(): Promise<Registro[]> {
   try {
-    return await getAllRecords();
+    const all = await storage.getAll();
+    // map StoredRegistro -> Registro
+    return all.map((s: any) => ({
+      id: s.id,
+      codigo: s.codigo,
+      peso: s.peso,
+      fecha: s.fecha,
+      hora: s.hora,
+      turno: s.turno,
+      raw: s.raw,
+    } as Registro));
   } catch (e) {
-    console.error("Error loading registros desde IDB:", e);
+    console.error("Error loading registros desde storage:", e);
     return [];
   }
 }
 
-// saveRecords kept for backward compatibility (writes to IDB via addRecords)
+// saveRecords kept for backward compatibility (writes via storage)
 export async function saveRecords(records: Registro[]) {
   try {
-    await addRecords(records);
+    await storage.write(records);
   } catch (e) {
     console.error("Error saving registros:", e);
   }
@@ -81,10 +91,11 @@ export async function addNewRecords(text: string): Promise<number> {
   });
 
   try {
-    const added = await addRecords(mapped);
-    return added;
+    // Persist via core storage (idempotent, native storage on device)
+    const res = await storage.write(mapped as any);
+    return res.added;
   } catch (e) {
-    console.error("Error guardando registros en DB:", e);
+    console.error("Error guardando registros en storage:", e);
     return 0;
   }
 }

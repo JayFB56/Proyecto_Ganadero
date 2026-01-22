@@ -1,25 +1,49 @@
 import "./App.css";
+
 import { useEffect, useState } from "react";
 import RegistroTable, { Registro } from "./components/RegistroTable";
 import { loadRecords, addNewRecords } from "./utils/dataStore";
+import storage from "./core/storage";
+import * as network from "./core/network";
+import SyncControl from "./components/SyncControl";
 
-const DATA_HOST = "http://192.168.4.1";
+const DEFAULT_DATA_HOST = "http://192.168.4.1";
 const TRY_PATHS = ["/data", "/registros.jsonl", "/registros.json", "/data.json", "/"]; // try these in order
 
 const App = () => {
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [fetchedPreview, setFetchedPreview] = useState<string | null>(null);
+  const [dataHost, setDataHost] = useState(() => {
+    return localStorage.getItem("esp32_data_host") || DEFAULT_DATA_HOST;
+  });
+  const [online, setOnline] = useState<boolean>(false);
+  const [pendingCount, setPendingCount] = useState<number>(0);
 
   useEffect(() => {
-    // keep local state in sync with localStorage in case other parts update it
+    // keep local state in sync with storage (source of truth)
     let mounted = true;
     (async () => {
       const stored = await loadRecords();
       if (mounted) setRegistros(stored);
+      // update pending count
+      const all = await storage.getAll();
+      const pend = all.filter((s: any) => s.status === "pending").length;
+      if (mounted) setPendingCount(pend);
+      const st = await network.getStatus();
+      setOnline(st);
     })();
-    return () => { mounted = false };
+
+    const unsub = network.subscribe((v) => {
+      setOnline(v);
+      // update pending count when network changes
+      (async () => {
+        const all = await storage.getAll();
+        setPendingCount(all.filter((s: any) => s.status === "pending").length);
+      })();
+    });
+
+    return () => { mounted = false; unsub(); };
   }, []);
 
   const descargarRegistros = async () => {
@@ -33,53 +57,40 @@ const App = () => {
         const n = Number(r.id);
         return Number.isFinite(n) ? Math.max(m, n) : m;
       }, 0);
-      for (const p of TRY_PATHS) {
-        const urlWithFrom = `${DATA_HOST}${p}${p.includes("?") ? "&" : "?"}from=${maxId}`;
-        const urlsToTry = [urlWithFrom, `${DATA_HOST}${p}`];
-        for (const u of urlsToTry) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-            const res = await fetch(u, { signal: controller.signal });
-            clearTimeout(timeout);
 
-            if (!res.ok) {
-              lastErr = new Error(`HTTP ${res.status} at ${u}`);
-              console.warn("Descarga: respuesta no OK", u, res.status);
-              continue;
-            }
-
-            const candidate = await res.text();
-            console.info("Descarga: contenido recibido (primeros 200 chars):", candidate?.slice(0,200));
-            // set preview to inspect in UI
-            setFetchedPreview(candidate?.slice(0,1000) ?? null);
-            if (candidate && candidate.trim().length > 0) {
-              text = candidate;
-              console.info("Descarga: éxito desde", u);
-              break;
-            } else {
-              lastErr = new Error(`Vacío en ${u}`);
-              console.warn("Descarga: contenido vacío en", u);
-            }
-          } catch (e: any) {
-            lastErr = e;
-            console.warn("Descarga falló en", u, e?.message || e);
-            // try next url
+      // Use core/balance to download from host; it uses native HTTP when possible (no CORS) and fetch as fallback
+      try {
+        const res = await (await import("./core/balance")).default.downloadFromHost(dataHost);
+        if (!res.ok) {
+          if (res.errorType === "network") {
+            lastErr = new Error("network");
+          } else if (res.errorType === "cors") {
+            lastErr = new Error("cors");
+          } else {
+            lastErr = res.error || new Error("unknown");
           }
-          if (text) break;
+        } else {
+          text = res.text ?? null;
+          console.info("Descarga: éxito desde", res.url);
         }
-        if (text) break;
+      } catch (e) {
+        lastErr = e;
+        console.warn("Descarga falló (downloadFromHost)", e);
       }
 
       if (!text) {
         // no successful download
-        const isNetwork = lastErr instanceof TypeError || (lastErr && /failed to fetch/i.test(String(lastErr)));
-        if (isNetwork) {
+        const msg = lastErr?.message || String(lastErr || "");
+        if (msg === "network") {
           setMessage(
-            "Error al descargar (conexión o CORS). Revisa la conexión WiFi al ESP y las cabeceras CORS del servidor."
+            "Error de red: no se pudo conectar al ESP. Revisa que el teléfono esté conectado a la red WiFi de la balanza."
+          );
+        } else if (msg === "cors") {
+          setMessage(
+            "Error de CORS: la versión web no puede acceder al ESP directamente. Prueba en el dispositivo con la app instalada o configura las cabeceras CORS en el servidor del ESP."
           );
         } else {
-          setMessage(`Error al descargar: ${lastErr?.message || lastErr || "Desconocido"}`);
+          setMessage(`Error al descargar: ${msg}`);
         }
         return;
       }
@@ -88,10 +99,19 @@ const App = () => {
       if (added > 0) {
         const all = await loadRecords();
         setRegistros(all);
+        // update pending count
+        try {
+          const storedAll = await storage.getAll();
+          setPendingCount(storedAll.filter((s: any) => s.status === "pending").length);
+        } catch (e) {
+          console.warn("Error reading pending count:", e);
+        }
+
         // confirm only after succesful save
         try {
-          const cRes = await fetch(`${DATA_HOST}/confirmar`);
-          if (!cRes.ok) console.warn("Confirm failed", cRes.status);
+          const mod = await import("./core/balance");
+          const ok = await (mod).confirmHost(dataHost);
+          if (!ok) console.warn("Confirm failed (confirmHost) or not supported");
         } catch (e) {
           console.warn("Error confirmando en ESP:", e);
         }
@@ -110,26 +130,27 @@ const App = () => {
     <div className="app-shell p-4">
       <h1 className="text-xl font-bold mb-4">LecheFácil — Registros</h1>
 
-      <div className="mb-4">
-        <button
-          className="download-btn px-4 py-2 rounded"
-          onClick={descargarRegistros}
-          disabled={loading}
-        >
-          {loading ? "Descargando..." : "Descargar registros"}
-        </button>
-        {/* no import button: app syncs directly with ESP */}
+
+
+      <div className="mb-4 text-sm">
+        <div>Estado de red: <strong>{online ? "Online" : "Offline"}</strong></div>
+        <div>Pendientes: <strong>{pendingCount}</strong></div>
       </div>
 
       {message && <div className="mb-4 text-sm">{message}</div>}
-      {fetchedPreview && (
-        <div className="mb-4 text-sm">
-          <strong>Depuración — Vista previa de la descarga:</strong>
-          <pre className="mt-2 p-2 bg-gray-100 overflow-auto" style={{ maxHeight: 200 }}>
-            {fetchedPreview}
-          </pre>
-        </div>
-      )}
+
+      {/* Sync section (manual) */}
+      <div className="mb-4 flex items-center gap-3">
+        <SyncControl pending={pendingCount} onSynced={(n) => setMessage(n > 0 ? `Sincronizados ${n} registros` : "Sin registros sincronizados.")} />
+        <button
+          className="download-btn px-3 py-1 rounded"
+          onClick={descargarRegistros}
+          disabled={loading}
+          title="Iniciar descarga de la balanza"
+        >
+          {loading ? "Actualizando..." : "Actualizar desde balanza"}
+        </button>
+      </div>
 
       <RegistroTable registros={registros} />
     </div>
