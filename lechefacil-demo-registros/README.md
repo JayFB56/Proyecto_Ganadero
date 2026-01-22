@@ -46,12 +46,5 @@ adb devices   # should show <ip>:port device
 Tip: if you need to reset USB auth, toggle USB debugging off/on and accept the RSA prompt, then repeat pairing.
 
 # Capture of app web
-<<<<<<< HEAD
-![alt text](image.png)
+<img width="1365" height="577" alt="image" src="https://github.com/user-attachments/assets/ee9cb6a1-cf20-47ed-9f2a-c432824bbd48" />
 
-![alt text](image-1.png)
-=======
-<img width="891" height="1021" alt="image" src="https://github.com/user-attachments/assets/2c3af149-0388-4245-9d17-ccd594660b3f" />
-
-
->>>>>>> 7033bb4305cc8b7648f324a2b6305d8121a4552a
