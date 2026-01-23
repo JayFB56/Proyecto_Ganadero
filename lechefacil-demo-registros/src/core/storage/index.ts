@@ -13,7 +13,7 @@ const SafeStorage = {
       const { value } = await Preferences.get({ key });
       return value;
     } catch (e) {
-      // Si falla Capacitor, intentamos fallback
+      // Si falla Capacitor, se intenta fallback
       return fallbackGet(key);
     }
   },
@@ -33,7 +33,7 @@ const SafeStorage = {
   }
 };
 
-// --- Lógica de Fallback (Separada para limpieza) ---
+// --- Lógica de Fallback ---
 async function fallbackGet(key: string): Promise<string | null> {
   try {
     const all = await getAllRecords();
@@ -70,7 +70,7 @@ async function fallbackSet(key: string, value: string): Promise<void> {
 // --- Utilidades ---
 
 function makeUid(r: Partial<Registro>): string {
-  // MEJORA: Asegurar que siempre devuelve string y manejar nulos con seguridad
+  // Asegurar que siempre devuelve string y manejar nulos con seguridad
   if (r.id) return String(r.id);
   return `${r.codigo || "NC"}|${r.fecha || "NF"}|${r.hora || "NH"}`;
 }
@@ -94,13 +94,12 @@ async function writeIndex(index: Record<string, { status: StorageStatus; created
 
 export async function write(records: Registro[] | Registro): Promise<WriteResult> {
   const recs = Array.isArray(records) ? records : [records];
-  // Leemos índice una sola vez al principio
   const index = await readIndex();
   
   let added = 0;
   const ids: string[] = [];
   let skipped = 0;
-  let indexDirty = false; // Flag para saber si necesitamos guardar el índice
+  let indexDirty = false; 
 
   const now = new Date().toISOString();
 
@@ -139,7 +138,7 @@ export async function write(records: Registro[] | Registro): Promise<WriteResult
     }
   }
 
-  // Solo escribimos el índice si hubo cambios (Ahorro de I/O)
+  // Solo escribimos el índice si hubo cambios 
   if (indexDirty) {
     try {
       await writeIndex(index);
@@ -155,7 +154,7 @@ export async function getAll(): Promise<StoredRegistro[]> {
   const index = await readIndex();
   const keys = Object.keys(index);
   
-  // MEJORA 2: Promise.all para concurrencia masiva
+  // Promise.all para concurrencia masiva
   // En lugar de esperar uno por uno, lanzamos todas las peticiones a la vez
   const promises = keys.map(async (k) => {
     const raw = await SafeStorage.get(ITEM_KEY_PREFIX + k);
@@ -179,7 +178,7 @@ export async function readPending(): Promise<StoredRegistro[]> {
     .filter(([, v]) => v.status === "pending")
     .map(([k]) => k);
 
-  // MEJORA 2: Promise.all aquí también
+  // Promise.all aquí también
   const promises = pendingKeys.map(async (uid) => {
     const raw = await SafeStorage.get(ITEM_KEY_PREFIX + uid);
     if (!raw) return null;
@@ -201,7 +200,7 @@ export async function updateStatus(uid: string, status: StorageStatus): Promise<
   try {
     const item = JSON.parse(raw) as StoredRegistro;
     
-    // Optimización: Si el estado es el mismo, no hacemos nada (Ahorro de escritura)
+    // Optimización, si el estado es el mismo, no hacemos nada
     if (item.status === status) return;
 
     item.status = status;

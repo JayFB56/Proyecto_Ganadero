@@ -34,7 +34,7 @@ function normalizeLine(line: string) {
   return line.trim();
 }
 
-// Accepts JSON, JSONL (newline-delimited JSON), or an object { last_id, records: [...] }
+// Accepts JSON, JSONL (newline-delimited JSON), or an object { last_id, records: [...]. }
 export async function addNewRecords(text: string): Promise<number> {
   if (!text) return 0;
   // strip BOM

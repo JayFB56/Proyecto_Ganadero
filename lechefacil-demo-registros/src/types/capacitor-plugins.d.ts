@@ -10,7 +10,6 @@ declare module "@capacitor/network" {
 declare module "@capacitor-community/http" {
   export const Http: any;
 }
-
 declare module "@capacitor/http" {
   export const Http: any;
 }

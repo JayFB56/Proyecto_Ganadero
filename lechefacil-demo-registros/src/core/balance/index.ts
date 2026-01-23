@@ -67,7 +67,6 @@ async function nativeHttpGet(
 
 /* ===========================
    2. Web Fetch (Fallback)
-   Se usa en Web o si falla el nativo
    =========================== */
 async function fetchGet(
   url: string,
@@ -80,7 +79,6 @@ async function fetchGet(
     const res = await fetch(url, {
       signal: controller.signal,
       cache: "no-store",
-      // mode: 'cors' // Normalmente necesario en web, el ESP debe soportarlo
     });
 
     const text = await res.text();
@@ -114,11 +112,9 @@ export async function downloadFromHost(
       if (res.ok && res.text && res.text.trim().length > 0) {
         return { ok: true, text: res.text, url, status: res.status };
       }
-      // Si responde 404 u otro error HTTP, dejamos que intente el fallback por si acaso,
-      // o podríamos retornar error aquí. Por robustez, dejamos continuar.
+
     } catch (e) {
-      // Falló la carga del plugin, el método nativo o timeout nativo.
-      // Silenciosamente continuamos al fallback (fetch).
+
     }
 
     // --- PASO 2: Fallback Web Fetch ---
@@ -132,13 +128,11 @@ export async function downloadFromHost(
         lastErr = new Error(`HTTP ${res.status}`);
       }
     } catch (e: any) {
-      // Clasificación básica de errores para feedback
       const msg = String(e?.message || "").toLowerCase();
 
       if (/timeout|network|failed to fetch/i.test(msg)) {
         lastErr = { type: "network", error: e };
       } else if (/cors|access-control/i.test(msg)) {
-        // Este es el error que Native HTTP soluciona en móvil
         lastErr = { type: "cors", error: e };
       } else {
         lastErr = { type: "other", error: e };
@@ -146,14 +140,12 @@ export async function downloadFromHost(
     }
   }
 
-  // Si llegamos aquí, fallaron todos los intentos
   const finalErr = lastErr?.error || lastErr;
   const finalType = lastErr?.type || "other";
 
   return { ok: false, errorType: finalType, error: finalErr };
 }
 
-// Función auxiliar para confirmar conexión
 export async function confirmHost(host: string, timeoutMs = 5000): Promise<boolean> {
   const res = await downloadFromHost(host, timeoutMs);
   return res.ok;

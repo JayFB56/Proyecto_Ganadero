@@ -13,7 +13,7 @@ export type StorageStatus = "pending" | "synced" | "failed";
 export type StoredRegistro = Registro & {
   uid: string;
   status: StorageStatus;
-  createdAt: string; // ISO
+  createdAt: string; 
 };
 
 export type WriteResult = {

@@ -55,12 +55,12 @@ function ensureWindowListeners() {
 
 export function subscribe(cb: NetworkListener): () => void {
   listeners.push(cb);
-  // init plugin in background
+  // init plugin in background.
   tryInitPlugin();
-  // if plugin not available, ensure window events
+  // if plugin not available, ensure window events.
   ensureWindowListeners();
 
-  // return unsubscribe
+  // return unsubscribe.
   return () => {
     listeners = listeners.filter((l) => l !== cb);
   };

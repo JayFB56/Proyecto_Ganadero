@@ -53,7 +53,7 @@ export async function addRecords(records: Registro[]): Promise<number> {
               console.warn("addRecords: put failed for", uid, e);
             };
           } else {
-            // already exists -> skip
+            // already exists --> skip
           }
         };
         g.onerror = (e) => {

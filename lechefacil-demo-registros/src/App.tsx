@@ -9,7 +9,7 @@ import SyncControl from "./components/SyncControl";
 import { downloadFromHost, confirmHost } from "./core/balance";
 
 const DEFAULT_DATA_HOST = "http://192.168.4.1";
-const TRY_PATHS = ["/data", "/registros.jsonl", "/registros.json", "/data.json", "/"]; // try these in order
+const TRY_PATHS = ["/data", "/registros.jsonl", "/registros.json", "/data.json", "/"]; 
 
 const App = () => {
   const [registros, setRegistros] = useState<Registro[]>([]);
@@ -81,7 +81,7 @@ const App = () => {
       }
 
       if (!text) {
-        // no successful download
+        
         const msg = lastErr?.message || String(lastErr || "");
         if (msg === "network") {
           setMessage(
@@ -108,13 +108,8 @@ const App = () => {
         } catch (e) {
           console.warn("Error reading pending count:", e);
         }
-
-        // confirm only after succesful save
-        // ... dentro de descargarRegistros ...
-
-        // SUSTITUYE TODO EL BLOQUE DEL TRY ANTERIOR POR ESTE:
+        
         try {
-          // Ya no necesitas await import().default
           const res = await downloadFromHost(dataHost);
 
           if (!res.ok) {
@@ -134,9 +129,8 @@ const App = () => {
           console.warn("Descarga falló (downloadFromHost)", e);
         }
 
-        // ... y más abajo cuando haces el confirmHost:
         try {
-          const ok = await confirmHost(dataHost); // Uso directo
+          const ok = await confirmHost(dataHost); 
           if (!ok) console.warn("Confirm failed (confirmHost) or not supported");
         } catch (e) {
           console.warn("Error confirmando en ESP:", e);
@@ -150,7 +144,6 @@ const App = () => {
     }
   };
 
-  // Import button removed: app uses direct fetch + confirm flow with ESP
 
   return (
     <div className="app-shell p-4">
