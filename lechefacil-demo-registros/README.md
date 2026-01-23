@@ -1,57 +1,129 @@
-# Frontend Blank Shell
+#  Arquitectura de Almacenamiento y Sincronización Offline/Online
 
-This project is a stripped-down React + Vite + Capacitor setup that renders a blank surface. Mobile support (Capacitor) remains, everything else was removed.
+Este proyecto implementa una arquitectura robusta para el manejo de **registros offline/online**, sincronización controlada, y compatibilidad tanto en **web como en plataformas nativas (Capacitor)**.
 
-## Prerequisites
-- Node.js ≥ 20
-- npm or yarn
-- JDK 21.
-- Android SDK/Platform Tools (`adb`).
+El enfoque prioriza **resiliencia**, **simplicidad**, y **escalabilidad**, asegurando que los datos no se pierdan ante caídas de red, cierres inesperados o fallos de sincronización.
 
-## Setup
-```sh
-npm i          # or yarn
+---
+
+##  Cambios principales
+
+### 1. Wrapper seguro para almacenamiento
+**Archivo:** `index.ts`
+
+- Implementación de un **SafeStorage** centralizado.
+- Uso de **@capacitor/preferences** como almacenamiento principal.
+- **Fallback automático a IndexedDB** cuando Preferences no esté disponible.
+- Manejo de un índice (`registros:index`) para:
+  - Identificar registros pendientes.
+  - Separar estados offline/online.
+- Garantiza persistencia de datos incluso sin conexión.
+
+---
+
+### 2. Sincronización simple y robusta
+**Archivo:** `index.ts`
+
+- Proceso de sincronización controlado y predecible.
+- Soporte de **concurrencia configurable**.
+- Manejo explícito de estados de sincronización:
+  - `pending` → registro pendiente de envío.
+  - `synced` → registro sincronizado correctamente.
+  - `failed` → error durante la sincronización.
+- Permite:
+  - Reintentos automáticos.
+  - Reintentos manuales desde la interfaz.
+
+---
+
+### 3. Control de sincronización en la UI
+**Componente:** `SyncControl.tsx`
+
+- Botón para iniciar sincronización manual.
+- Visualización de estados básicos.
+- Manejo simple de errores.
+- Reintentos sin bloquear la aplicación.
+- Pensado para usuarios finales y operadores.
+
+---
+
+### 4. Tabla de registros mejorada
+**Componente:** `RegistroTable.tsx`
+
+- Tabla optimizada para visualización clara de datos.
+- Soporte de **ordenamiento** por:
+  - Código
+  - Peso
+  - Fecha
+  - Hora
+  - Turno (AM / PM)
+- Diseño limpio y legible.
+- Preparada para grandes volúmenes de registros.
+
+---
+
+### 5. Gestión de red con fallback
+**Archivo:** `index.ts`
+
+- Uso prioritario de **@capacitor/network** para detectar conectividad.
+- Fallback automático a:
+  - `navigator.onLine`
+  - Eventos `online` / `offline` del navegador.
+- Suscripción a cambios de red para:
+  - Lanzar sincronizaciones automáticas.
+  - Actualizar estados internos.
+
+---
+
+### 6. Inicialización ampliada de Capacitor
+**Archivo:** `capacitor-init.ts`
+
+- Soporte para **Edge-to-Edge** en Android.
+- Control de **StatusBar**.
+- Notificación de estado de la app a:
+  - `@capgo/capacitor-updater`
+- Solo se ejecuta en plataformas nativas (Android / iOS).
+
+---
+
+### 7. Tipos y declaraciones
+**Archivos:**
+- `types.ts`
+- `capacitor-plugins.d.ts`
+
+Incluye:
+- Nuevos tipos:
+  - `StoredRegistro`
+  - `StorageStatus`
+- Declaraciones mínimas para plugins Capacitor.
+- Mejora el tipado y evita errores en TypeScript.
+
+---
+
+##  Módulos / dependencias agregadas (esenciales)
+
+## 📦 Dependencias
+
+### Dependencias de producción
+
+```bash
+npm install @capacitor/preferences
+npm install @capacitor/network
+npm install @capgo/capacitor-updater
+npm install @capawesome/capacitor-android-edge-to-edge-support
+npm install @capacitor/status-bar
+npm install @capacitor-community/sqlite
 ```
 
-## Web
-```sh
-npm run dev
-# build
-npm run build
+### Dependencias de desarrollo
+
+```bash
+npm install -D lovable-tagger
+npm install tailwindcss-animate
 ```
 
-## Android (Capacitor)
+## Captura de la aplicación (Web)
 
-Sync and run:
-```sh
-npm run mobile:run:android   # or yarn mobile:run:android
-```
+<img width="1365" height="577" alt="Vista de la aplicación web" src="https://github.com/user-attachments/assets/ee9cb6a1-cf20-47ed-9f2a-c432824bbd48" />
 
 
-## Connect a physical Android device over Wi‑Fi (pairing code)
-1) On the phone: enable Developer Options → Wireless debugging → Pair device with pairing code. Note IP:pairingPort and the 6‑digit code.  
-2) In the terminal:
-```sh
-adb disconnect
-adb pair <ip>:<pairingPort>   # enter the 6-digit code
-adb devices                   # should list adb-... device
-```
-3) Connect for debugging (if another connect port is shown on the phone):
-```sh
-adb connect <ip>:<connectPort>
-adb devices   # should show <ip>:port device
-```
-4) Run `yarn mobile:run:android` and pick the device when prompted.
-
-Tip: if you need to reset USB auth, toggle USB debugging off/on and accept the RSA prompt, then repeat pairing.
-
-# Capture of app web
-<<<<<<< HEAD
-![alt text](image.png)
-
-![alt text](image-1.png)
-=======
-<img width="891" height="1021" alt="image" src="https://github.com/user-attachments/assets/2c3af149-0388-4245-9d17-ccd594660b3f" />
-
-
->>>>>>> 7033bb4305cc8b7648f324a2b6305d8121a4552a
