@@ -123,7 +123,9 @@ npm install tailwindcss-animate
 ```
 
 ## Captura de la aplicación (Web)
+<img width="263" height="552" alt="image" src="https://github.com/user-attachments/assets/4247af40-1c83-49d3-b312-019895e45881" />
 
+---
 <img width="1365" height="577" alt="Vista de la aplicación web" src="https://github.com/user-attachments/assets/ee9cb6a1-cf20-47ed-9f2a-c432824bbd48" />
 
 
