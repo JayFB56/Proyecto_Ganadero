@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appName: 'LecheFacil',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'http'
   },
   plugins: {
     Camera: {

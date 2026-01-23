@@ -6,6 +6,7 @@ import { loadRecords, addNewRecords } from "./utils/dataStore";
 import storage from "./core/storage";
 import * as network from "./core/network";
 import SyncControl from "./components/SyncControl";
+import { downloadFromHost, confirmHost } from "./core/balance";
 
 const DEFAULT_DATA_HOST = "http://192.168.4.1";
 const TRY_PATHS = ["/data", "/registros.jsonl", "/registros.json", "/data.json", "/"]; // try these in order
@@ -60,7 +61,8 @@ const App = () => {
 
       // Use core/balance to download from host; it uses native HTTP when possible (no CORS) and fetch as fallback
       try {
-        const res = await (await import("./core/balance")).default.downloadFromHost(dataHost);
+        const res = await downloadFromHost(dataHost);
+
         if (!res.ok) {
           if (res.errorType === "network") {
             lastErr = new Error("network");
@@ -83,7 +85,7 @@ const App = () => {
         const msg = lastErr?.message || String(lastErr || "");
         if (msg === "network") {
           setMessage(
-            "Error de red: no se pudo conectar al ESP. Revisa que el teléfono esté conectado a la red WiFi de la balanza."
+            "Error de red con la Balanza"
           );
         } else if (msg === "cors") {
           setMessage(
@@ -108,9 +110,33 @@ const App = () => {
         }
 
         // confirm only after succesful save
+        // ... dentro de descargarRegistros ...
+
+        // SUSTITUYE TODO EL BLOQUE DEL TRY ANTERIOR POR ESTE:
         try {
-          const mod = await import("./core/balance");
-          const ok = await (mod).confirmHost(dataHost);
+          // Ya no necesitas await import().default
+          const res = await downloadFromHost(dataHost);
+
+          if (!res.ok) {
+            if (res.errorType === "network") {
+              lastErr = new Error("network");
+            } else if (res.errorType === "cors") {
+              lastErr = new Error("cors");
+            } else {
+              lastErr = res.error || new Error("unknown");
+            }
+          } else {
+            text = res.text ?? null;
+            console.info("Descarga: éxito desde", res.url);
+          }
+        } catch (e) {
+          lastErr = e;
+          console.warn("Descarga falló (downloadFromHost)", e);
+        }
+
+        // ... y más abajo cuando haces el confirmHost:
+        try {
+          const ok = await confirmHost(dataHost); // Uso directo
           if (!ok) console.warn("Confirm failed (confirmHost) or not supported");
         } catch (e) {
           console.warn("Error confirmando en ESP:", e);
