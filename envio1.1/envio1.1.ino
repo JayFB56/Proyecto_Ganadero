@@ -10,7 +10,7 @@
 #include <ArduinoJson.h>
 
 // ---------- CONFIGURACIÓN ----------
-float factor_calibracion = 17100.90;
+float factor_calibracion = -435000.0;
 
 #define DOUT 15
 #define SCK 5
@@ -56,6 +56,8 @@ void addCORS() {
 void initFS() {
   if (!LittleFS.begin(true)) {
     Serial.println("Error LittleFS");
+    digitalWrite(LED_ERROR, HIGH);
+    tone(BUZZER, 400, 300);
     return;
   }
 
@@ -80,15 +82,16 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
   Wire1.begin(RTC_SDA, RTC_SCL);
-  rtc.begin(&Wire1);
+  if (!rtc.begin(&Wire1)) {
+    digitalWrite(LED_ERROR, HIGH);
+    tone(BUZZER, 400, 500);
+  }
 
   scale.begin(DOUT, SCK);
   scale.set_scale(factor_calibracion);
   scale.tare();
 
   WiFi.softAP("Balanza", "12345678");
-
-  // ---------- ENDPOINTS ----------
 
   server.on("/data", HTTP_OPTIONS, [](){
     addCORS();
@@ -117,8 +120,6 @@ void setup() {
   });
 
   server.begin();
-  Serial.println("Servidor activo en http://192.168.4.1");
-
   actualizarPantalla("");
 }
 
@@ -141,10 +142,10 @@ void loop() {
   if (isdigit(key) && codigo.length() < 6) {
     codigo += key;
     tone(BUZZER, 1000, 50);
-  } 
+  }
   else if (key == '*') {
     codigo = "";
-  } 
+  }
   else if (key == 'A') {
     guardarRegistro();
   }
@@ -175,15 +176,30 @@ void guardarRegistro() {
   if (codigo == "") return;
 
   File f = LittleFS.open(REG_FILE, "r");
+  if (!f) {
+    digitalWrite(LED_ERROR, HIGH);
+    tone(BUZZER, 400, 300);
+    actualizarPantalla("ERROR FS");
+    mensajeTimer = millis() + 1500;
+    return;
+  }
+
   DynamicJsonDocument doc(4096);
-  deserializeJson(doc, f);
+  DeserializationError err = deserializeJson(doc, f);
   f.close();
 
+  if (err) {
+    digitalWrite(LED_ERROR, HIGH);
+    tone(BUZZER, 400, 300);
+    actualizarPantalla("ERROR JSON");
+    mensajeTimer = millis() + 1500;
+    return;
+  }
+
   JsonArray arr = doc.as<JsonArray>();
-
   DateTime now = rtc.now();
-  JsonObject reg = arr.createNestedObject();
 
+  JsonObject reg = arr.createNestedObject();
   reg["codigo"] = codigo;
   reg["peso_lb"] = round(pesoLB * 100) / 100.0;
   reg["fecha"] = String(now.day()) + "/" + String(now.month()) + "/" + String(now.year());
@@ -192,11 +208,27 @@ void guardarRegistro() {
   reg["sync"] = false;
 
   f = LittleFS.open(REG_FILE, "w");
+  if (!f) {
+    digitalWrite(LED_ERROR, HIGH);
+    tone(BUZZER, 400, 300);
+    actualizarPantalla("ERROR FS");
+    mensajeTimer = millis() + 1500;
+    return;
+  }
+
   serializeJson(doc, f);
   f.close();
 
+  // --- CONFIRMACIÓN ---
   codigo = "";
-  tone(BUZZER, 1500, 150);
+
+  digitalWrite(LED_CHECK, HIGH);
+  tone(BUZZER, 1500, 200);
+
   actualizarPantalla("GUARDADO");
   mensajeTimer = millis() + 1500;
+
+  delay(1500);
+  digitalWrite(LED_CHECK, LOW);
+  digitalWrite(LED_ERROR, LOW);
 }
