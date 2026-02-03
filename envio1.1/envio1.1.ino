@@ -8,6 +8,7 @@
 #include <Keypad.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include "time.h" // Librería nativa para servidores NTP
 
 // ---------- CONFIGURACIÓN ----------
 float factor_calibracion = -435000.0;
@@ -22,9 +23,16 @@ float factor_calibracion = -435000.0;
 #define LED_ERROR 17
 #define BUZZER 23
 
+// Configuración Servidor de Tiempo (NTP)
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = -18000; // Ajuste para tu zona horaria (Ej: -18000 para GMT-5)
+const int   daylightOffset_sec = 0;
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 #define REG_FILE "/registros.json"
 
-Adafruit_SSD1306 display(128, 64, &Wire, -1);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HX711 scale;
 RTC_DS3231 rtc;
 WebServer server(80);
@@ -55,12 +63,9 @@ void addCORS() {
 
 void initFS() {
   if (!LittleFS.begin(true)) {
-    Serial.println("Error LittleFS");
     digitalWrite(LED_ERROR, HIGH);
-    tone(BUZZER, 400, 300);
     return;
   }
-
   if (!LittleFS.exists(REG_FILE)) {
     File f = LittleFS.open(REG_FILE, "w");
     f.print("[]");
@@ -68,48 +73,62 @@ void initFS() {
   }
 }
 
+// Sincronizar RTC con servidor de internet
+void sincronizarHoraNTP() {
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+    Serial.println("RTC Sincronizado con NTP");
+  }
+}
+
+void actualizarPantalla(String msg);
+void guardarRegistro();
+
 // ---------- SETUP ----------
 void setup() {
   Serial.begin(115200);
-
   pinMode(LED_CHECK, OUTPUT);
   pinMode(LED_ERROR, OUTPUT);
   pinMode(BUZZER, OUTPUT);
 
   initFS();
 
+  // Iniciar OLED en pines 18 y 19 (Confirmado funcional)
   Wire.begin(OLED_SDA, OLED_SCL);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    for(;;); 
+  }
+  display.clearDisplay();
+  display.display();
 
+  // Iniciar RTC
   Wire1.begin(RTC_SDA, RTC_SCL);
   if (!rtc.begin(&Wire1)) {
     digitalWrite(LED_ERROR, HIGH);
-    tone(BUZZER, 400, 500);
   }
 
   scale.begin(DOUT, SCK);
   scale.set_scale(factor_calibracion);
   scale.tare();
 
-  WiFi.softAP("Balanza", "12345678");
+  // Configuración WiFi (Modo AP + Intento de conexión para NTP)
+  WiFi.softAP("Balanza_OLED", "12345678");
+  
+  // Opcional: Si quieres que sincronice hora, debe conectarse a un WiFi real
+  // WiFi.begin("TU_SSID", "TU_PASSWORD"); 
+  
+  sincronizarHoraNTP();
 
-  server.on("/data", HTTP_OPTIONS, [](){
-    addCORS();
-    server.send(204);
-  });
-
+  // Endpoints del servidor
+  server.on("/data", HTTP_OPTIONS, [](){ addCORS(); server.send(204); });
   server.on("/data", HTTP_GET, [](){
     addCORS();
     File f = LittleFS.open(REG_FILE, "r");
     server.streamFile(f, "application/json");
     f.close();
   });
-
-  server.on("/confirmar", HTTP_OPTIONS, [](){
-    addCORS();
-    server.send(204);
-  });
-
   server.on("/confirmar", HTTP_GET, [](){
     addCORS();
     LittleFS.remove(REG_FILE);
@@ -129,44 +148,68 @@ void loop() {
 
   if (scale.is_ready()) {
     pesoLB = scale.get_units(1) * 2.20462;
+    if (pesoLB < 0) pesoLB = 0.0; // Evitar pesos negativos por deriva
   }
 
-  if (mensajeTimer > 0 && millis() > mensajeTimer) {
-    mensajeTimer = 0;
+  if (mensajeTimer > 0) {
+    if (millis() > mensajeTimer) {
+      mensajeTimer = 0;
+      actualizarPantalla(""); 
+    }
+  } else {
     actualizarPantalla("");
   }
 
   char key = keypad.getKey();
-  if (!key) return;
-
-  if (isdigit(key) && codigo.length() < 6) {
-    codigo += key;
-    tone(BUZZER, 1000, 50);
-  }
-  else if (key == '*') {
-    codigo = "";
-  }
-  else if (key == 'A') {
-    guardarRegistro();
+  if (key) {
+    if (isdigit(key) && codigo.length() < 6) {
+      codigo += key;
+      tone(BUZZER, 1000, 50);
+    }
+    else if (key == '*') {
+      codigo = "";
+    }
+    else if (key == 'A') {
+      guardarRegistro();
+    }
   }
 }
 
-// ---------- DISPLAY ----------
+// ---------- DISPLAY OLED 0.96 (Amarillo/Azul) ----------
 void actualizarPantalla(String msg) {
   display.clearDisplay();
-  display.setTextColor(WHITE);
+  display.setTextColor(SSD1306_WHITE);
 
+  // ZONA AMARILLA (0-15)
   DateTime now = rtc.now();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.printf("%02d/%02d %02d:%02d",
-    now.day(), now.month(), now.hour(), now.minute());
+  display.printf("%02d/%02d/%04d", now.day(), now.month(), now.year());
+  display.setCursor(85, 0);
+  display.printf("%02d:%02d", now.hour(), now.minute());
 
-  display.drawLine(0, 12, 128, 12, WHITE);
+  display.drawLine(0, 14, 128, 14, SSD1306_WHITE);
 
-  display.setTextSize(2);
-  display.setCursor(0, 24);
-  display.print(msg != "" ? msg : codigo);
+  // ZONA AZUL (16-64)
+  if (msg != "") {
+    display.setTextSize(2);
+    display.setCursor(10, 30);
+    display.print(msg);
+  } 
+  else {
+    // Peso grande
+    display.setTextSize(2);
+    display.setCursor(0, 20);
+    display.print(pesoLB, 2);
+    display.setTextSize(1);
+    display.print(" lb");
+
+    // Código abajo
+    display.setCursor(0, 48);
+    display.print("COD: ");
+    display.setTextSize(2);
+    display.print(codigo == "" ? "------" : codigo);
+  }
 
   display.display();
 }
@@ -176,25 +219,11 @@ void guardarRegistro() {
   if (codigo == "") return;
 
   File f = LittleFS.open(REG_FILE, "r");
-  if (!f) {
-    digitalWrite(LED_ERROR, HIGH);
-    tone(BUZZER, 400, 300);
-    actualizarPantalla("ERROR FS");
-    mensajeTimer = millis() + 1500;
-    return;
-  }
+  if (!f) return;
 
   DynamicJsonDocument doc(4096);
-  DeserializationError err = deserializeJson(doc, f);
+  deserializeJson(doc, f);
   f.close();
-
-  if (err) {
-    digitalWrite(LED_ERROR, HIGH);
-    tone(BUZZER, 400, 300);
-    actualizarPantalla("ERROR JSON");
-    mensajeTimer = millis() + 1500;
-    return;
-  }
 
   JsonArray arr = doc.as<JsonArray>();
   DateTime now = rtc.now();
@@ -204,31 +233,21 @@ void guardarRegistro() {
   reg["peso_lb"] = round(pesoLB * 100) / 100.0;
   reg["fecha"] = String(now.day()) + "/" + String(now.month()) + "/" + String(now.year());
   reg["hora"] = String(now.hour()) + ":" + String(now.minute());
-  reg["turno"] = now.hour() < 12 ? "AM" : "PM";
   reg["sync"] = false;
 
   f = LittleFS.open(REG_FILE, "w");
-  if (!f) {
-    digitalWrite(LED_ERROR, HIGH);
-    tone(BUZZER, 400, 300);
-    actualizarPantalla("ERROR FS");
-    mensajeTimer = millis() + 1500;
-    return;
+  if (f) {
+    serializeJson(doc, f);
+    f.close();
   }
 
-  serializeJson(doc, f);
-  f.close();
-
-  // --- CONFIRMACIÓN ---
   codigo = "";
-
   digitalWrite(LED_CHECK, HIGH);
   tone(BUZZER, 1500, 200);
-
   actualizarPantalla("GUARDADO");
   mensajeTimer = millis() + 1500;
-
-  delay(1500);
+  
+  // El delay de 1.5s se maneja con el timer para no bloquear el servidor
+  delay(200); 
   digitalWrite(LED_CHECK, LOW);
-  digitalWrite(LED_ERROR, LOW);
 }
