@@ -1,178 +1,129 @@
 import "./App.css";
 
 import { useEffect, useState } from "react";
-import RegistroTable, { Registro } from "./components/RegistroTable";
-import { loadRecords, addNewRecords } from "./utils/dataStore";
-import storage from "./core/storage";
-import * as network from "./core/network";
-import SyncControl from "./components/SyncControl";
-import { downloadFromHost, confirmHost } from "./core/balance";
+import { UnitsProvider } from "./core/unitsContext";
+import CowManagerV2 from "./components/CowManagerV2";
+import CowDashboardV2 from "./components/CowDashboardV2";
+import GlobalDashboard from "./components/GlobalDashboard";
+import UnitsSelector from "./components/UnitsSelector";
+import { getVacas, Vaca } from "./core/firebase";
 
-const DEFAULT_DATA_HOST = "http://192.168.4.1";
-const TRY_PATHS = ["/data", "/registros.jsonl", "/registros.json", "/data.json", "/"]; 
+type Seccion = "individual" | "global";
 
 const App = () => {
-  const [registros, setRegistros] = useState<Registro[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [dataHost, setDataHost] = useState(() => {
-    return localStorage.getItem("esp32_data_host") || DEFAULT_DATA_HOST;
-  });
-  const [online, setOnline] = useState<boolean>(false);
-  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [vacas, setVacas] = useState<Vaca[]>([]);
+  const [selectedVaca, setSelectedVaca] = useState<Vaca | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [seccion, setSeccion] = useState<Seccion>("individual");
 
   useEffect(() => {
-    // keep local state in sync with storage (source of truth)
-    let mounted = true;
-    (async () => {
-      const stored = await loadRecords();
-      if (mounted) setRegistros(stored);
-      // update pending count
-      const all = await storage.getAll();
-      const pend = all.filter((s: any) => s.status === "pending").length;
-      if (mounted) setPendingCount(pend);
-      const st = await network.getStatus();
-      setOnline(st);
-    })();
-
-    const unsub = network.subscribe((v) => {
-      setOnline(v);
-      // update pending count when network changes
-      (async () => {
-        const all = await storage.getAll();
-        setPendingCount(all.filter((s: any) => s.status === "pending").length);
-      })();
+    setLoading(true);
+    getVacas((loadedVacas) => {
+      setVacas(loadedVacas);
+      setLoading(false);
+      if (loadedVacas.length > 0 && !selectedVaca) {
+        setSelectedVaca(loadedVacas[0]);
+      }
     });
-
-    return () => { mounted = false; unsub(); };
   }, []);
 
-  const descargarRegistros = async () => {
-    setMessage(null);
-    setLoading(true);
-    let lastErr: any = null;
-    try {
-      let text: string | null = null;
-      const existing = await loadRecords();
-      const maxId = existing.reduce((m, r) => {
-        const n = Number(r.id);
-        return Number.isFinite(n) ? Math.max(m, n) : m;
-      }, 0);
-
-      // Use core/balance to download from host; it uses native HTTP when possible (no CORS) and fetch as fallback
-      try {
-        const res = await downloadFromHost(dataHost);
-
-        if (!res.ok) {
-          if (res.errorType === "network") {
-            lastErr = new Error("network");
-          } else if (res.errorType === "cors") {
-            lastErr = new Error("cors");
-          } else {
-            lastErr = res.error || new Error("unknown");
-          }
-        } else {
-          text = res.text ?? null;
-          console.info("Descarga: éxito desde", res.url);
-        }
-      } catch (e) {
-        lastErr = e;
-        console.warn("Descarga falló (downloadFromHost)", e);
-      }
-
-      if (!text) {
-        
-        const msg = lastErr?.message || String(lastErr || "");
-        if (msg === "network") {
-          setMessage(
-            "Error de red con la Balanza"
-          );
-        } else if (msg === "cors") {
-          setMessage(
-            "Error de CORS: la versión web no puede acceder al ESP directamente. Prueba en el dispositivo con la app instalada o configura las cabeceras CORS en el servidor del ESP."
-          );
-        } else {
-          setMessage(`Error al descargar: ${msg}`);
-        }
-        return;
-      }
-
-      const added = await addNewRecords(text);
-      if (added > 0) {
-        const all = await loadRecords();
-        setRegistros(all);
-        // update pending count
-        try {
-          const storedAll = await storage.getAll();
-          setPendingCount(storedAll.filter((s: any) => s.status === "pending").length);
-        } catch (e) {
-          console.warn("Error reading pending count:", e);
-        }
-        
-        try {
-          const res = await downloadFromHost(dataHost);
-
-          if (!res.ok) {
-            if (res.errorType === "network") {
-              lastErr = new Error("network");
-            } else if (res.errorType === "cors") {
-              lastErr = new Error("cors");
-            } else {
-              lastErr = res.error || new Error("unknown");
-            }
-          } else {
-            text = res.text ?? null;
-            console.info("Descarga: éxito desde", res.url);
-          }
-        } catch (e) {
-          lastErr = e;
-          console.warn("Descarga falló (downloadFromHost)", e);
-        }
-
-        try {
-          const ok = await confirmHost(dataHost); 
-          if (!ok) console.warn("Confirm failed (confirmHost) or not supported");
-        } catch (e) {
-          console.warn("Error confirmando en ESP:", e);
-        }
-      }
-      setMessage(added > 0 ? `Se añadieron ${added} registros nuevos.` : "No hay registros nuevos.");
-    } catch (err: any) {
-      setMessage(`Error inesperado: ${err?.message || err}`);
-    } finally {
-      setLoading(false);
+  const handleVacasChange = (updatedVacas: Vaca[]) => {
+    setVacas(updatedVacas);
+    if (updatedVacas.length > 0 && !selectedVaca) {
+      setSelectedVaca(updatedVacas[0]);
+    }
+    if (selectedVaca && !updatedVacas.find((v) => v.id === selectedVaca.id)) {
+      setSelectedVaca(updatedVacas.length > 0 ? updatedVacas[0] : null);
     }
   };
 
-
   return (
-    <div className="app-shell p-4">
-      <h1 className="text-xl font-bold mb-4">LecheFácil — Registros</h1>
+    <UnitsProvider>
+      <div className="app-layout">
+        {/* Header */}
+        <header className="app-header">
+          <div className="header-content">
+            <div className="header-title-group">
+              <h1 className="app-title">LecheFácil</h1>
+              <p className="app-subtitle">Dashboard de Producción Lechera</p>
+            </div>
+            <div className="header-controls">
+              <UnitsSelector />
+            </div>
+          </div>
+        </header>
 
+        {/* Main Navigation */}
+        <nav className="nav-tabs">
+          <div className="nav-container">
+            <div className="nav-buttons">
+              <button
+                onClick={() => setSeccion("individual")}
+                className={`nav-btn ${seccion === "individual" ? "active" : ""}`}
+              >
+                Por Vaca
+              </button>
+              <button
+                onClick={() => setSeccion("global")}
+                className={`nav-btn ${seccion === "global" ? "active" : ""}`}
+              >
+                Visión Global
+              </button>
+            </div>
+          </div>
+        </nav>
 
+        {/* Main Content */}
+        <main className="app-main">
+          <div className="container">
+            {/* Gestor de Vacas */}
+            <CowManagerV2 onVacasChange={handleVacasChange} />
 
-      <div className="mb-4 text-sm">
-        <div>Estado de red: <strong>{online ? "Online" : "Offline"}</strong></div>
-        <div>Pendientes: <strong>{pendingCount}</strong></div>
+            {/* Selección de Vaca (si estamos en vista individual) */}
+            {seccion === "individual" && vacas.length > 0 && (
+              <div className="cow-selector">
+                <div className="selector-header">
+                  <span>Selecciona una vaca:</span>
+                </div>
+                <div className="selector-buttons">
+                  {vacas.map((vaca) => (
+                    <button
+                      key={vaca.id}
+                      onClick={() => setSelectedVaca(vaca)}
+                      className={`cow-btn ${selectedVaca?.id === vaca.id ? "active" : ""}`}
+                    >
+                      {vaca.nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Principal */}
+            {loading ? (
+              <div className="loading-section">
+                <p>Cargando datos...</p>
+              </div>
+            ) : seccion === "individual" ? (
+              selectedVaca ? (
+                <CowDashboardV2 key={selectedVaca.id} vaca={selectedVaca} />
+              ) : (
+                <div className="empty-section">
+                  <p>Crea una vaca para comenzar</p>
+                </div>
+              )
+            ) : (
+              <GlobalDashboard vacas={vacas} />
+            )}
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="app-footer">
+          <p>LecheFácil © 2025 - Sistema de Monitoreo de Producción Lechera</p>
+        </footer>
       </div>
-
-      {message && <div className="mb-4 text-sm">{message}</div>}
-
-      {/* Sync section (manual) */}
-      <div className="mb-4 flex items-center gap-3">
-        <SyncControl pending={pendingCount} onSynced={(n) => setMessage(n > 0 ? `Sincronizados ${n} registros` : "Sin registros sincronizados.")} />
-        <button
-          className="download-btn px-3 py-1 rounded"
-          onClick={descargarRegistros}
-          disabled={loading}
-          title="Iniciar descarga de la balanza"
-        >
-          {loading ? "Actualizando..." : "Actualizar desde balanza"}
-        </button>
-      </div>
-
-      <RegistroTable registros={registros} />
-    </div>
+    </UnitsProvider>
   );
 };
 

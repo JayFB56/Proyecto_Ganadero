@@ -7,7 +7,8 @@
 #include <Keypad.h>
 #include "SPIFFS.h"
 #include <WiFi.h>
-#include <WebServer.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 #define DT 15
 #define SCK 21
@@ -27,10 +28,11 @@
 #define ROWS 4
 #define COLS 4
 
-const char* ssid = "Balanza";
-const char* password = "12345678";
-
-WebServer server(80);
+// CONFIGURACIÓN WIFI Y FIREBASE
+const char* ssid = "THELAPTOP";           // CAMBIAR: Nombre de tu WiFi
+const char* password = "12345678";   // CAMBIAR: Contraseña de tu WiFi
+const char* firebase_host = "https://lechefacil-22cf0-default-rtdb.firebaseio.com/"; // CAMBIAR: Tu URL Firebase
+const char* firebase_secret = "YPA0OWn7ARdlyFZP42WEo40FdGiYDz060MgkTk1e"; // CAMBIAR: Tu Secret de Firebase (opcional, usa reglas en su lugar)
 
 char keys[ROWS][COLS] = {
   {'1','2','3','A'},
@@ -61,6 +63,7 @@ unsigned long lastOLED = 0;
 unsigned long msgUntil = 0;
 bool showMsg = false;
 String msgText = "";
+bool wifiConnected = false;
 
 void beep(int f, int d) {
   tone(BUZZER, f, d);
@@ -69,23 +72,60 @@ void beep(int f, int d) {
   digitalWrite(BUZZER, LOW);
 }
 
-void handleRoot() {
-  if (!SPIFFS.exists("/registros.json")) {
-    server.send(200, "application/json", "[]");
+void sendToFirebase(String codigo, float peso, String fecha, String hora, String turno) {
+  if (!wifiConnected) {
+    msgText = "NO HAY WIFI";
+    msgUntil = millis() + 2000;
+    showMsg = true;
     return;
   }
 
-  File f = SPIFFS.open("/registros.json", FILE_READ);
-  String content = "[\n";
-  while (f.available()) {
-    content += f.readStringUntil('\n');
-    content += ",\n";
-  }
-  f.close();
+  HTTPClient http;
+  
+  // Crear JSON con los datos
+  StaticJsonDocument<256> doc;
+  doc["codigo"] = codigo;
+  doc["peso"] = peso;
+  doc["fecha"] = fecha;
+  doc["hora"] = hora;
+  doc["turno"] = turno;
+  doc["timestamp"] = millis();
 
-  content.remove(content.length() - 2);
-  content += "\n]";
-  server.send(200, "application/json", content);
+  String jsonString;
+  serializeJson(doc, jsonString);
+
+  // URL del endpoint de Firebase (Realtime DB)
+  String url = String(firebase_host) + "/registros.json";
+  
+  Serial.println("[FIREBASE] Enviando: " + jsonString);
+  Serial.println("[FIREBASE] URL: " + url);
+
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.POST(jsonString);
+  
+  if (httpCode > 0) {
+    Serial.println("[FIREBASE] Response code: " + String(httpCode));
+    if (httpCode == 200 || httpCode == 201) {
+      digitalWrite(LED_OK, HIGH);
+      beep(2000, 120);
+      msgText = "ENVIADO A NUBE";
+    } else {
+      digitalWrite(LED_ERR, HIGH);
+      beep(400, 300);
+      msgText = "ERROR NUBE: " + String(httpCode);
+    }
+  } else {
+    Serial.println("[FIREBASE] Error: " + http.errorToString(httpCode));
+    digitalWrite(LED_ERR, HIGH);
+    beep(400, 300);
+    msgText = "ERROR CONEXION";
+  }
+  
+  http.end();
+  msgUntil = millis() + 2000;
+  showMsg = true;
 }
 
 void saveRecord() {
@@ -100,18 +140,9 @@ void saveRecord() {
   sprintf(date, "%02d/%02d/%04d", now.day(), now.month(), now.year());
   sprintf(time, "%02d:%02d", hour, now.minute());
 
-  File f = SPIFFS.open("/registros.json", FILE_APPEND);
-  if (f) {
-    f.printf("{\"codigo\":\"%s\",\"peso\":%.2f,\"fecha\":\"%s\",\"hora\":\"%s\",\"turno\":\"%s\"}\n",
-             code.c_str(), grams, date, time, pm ? "pm" : "am");
-    f.close();
-  }
+  // Enviar directamente a Firebase (sin guardar localmente)
+  sendToFirebase(code, grams, String(date), String(time), pm ? "pm" : "am");
 
-  digitalWrite(LED_OK, HIGH);
-  beep(2000, 120);
-  msgText = "REGISTRO GUARDADO";
-  msgUntil = millis() + 2000;
-  showMsg = true;
   code = "";
 }
 
@@ -132,11 +163,26 @@ void setup() {
   pinMode(LED_OK, OUTPUT);
   pinMode(LED_ERR, OUTPUT);
 
-  SPIFFS.begin(true);
-
-  WiFi.softAP(ssid, password);
-  server.on("/", handleRoot);
-  server.begin();
+  // Inicializar WiFi (conectarse a red existente)
+  Serial.println("\n\n[SETUP] Iniciando WiFi...");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WIFI] Conectado!");
+    Serial.println("[WIFI] IP: " + WiFi.localIP().toString());
+    wifiConnected = true;
+  } else {
+    Serial.println("\n[WIFI] No se pudo conectar. Verifica SSID y password.");
+    wifiConnected = false;
+  }
 
   scale.begin(DT, SCK);
   scale.set_scale(calibration_factor);
@@ -153,8 +199,13 @@ void setup() {
 }
 
 void loop() {
-
-  server.handleClient();
+  // Verificar conexión WiFi periódicamente
+  if (WiFi.status() != WL_CONNECTED && !wifiConnected) {
+    wifiConnected = false;
+  } else if (WiFi.status() == WL_CONNECTED && !wifiConnected) {
+    wifiConnected = true;
+    Serial.println("[WIFI] Reconectado!");
+  }
 
   if (scale.is_ready()) {
     samples[idx++] = scale.get_units(1);
@@ -236,6 +287,11 @@ void loop() {
     oled.setTextSize(3);
     oled.setCursor(10, 34);
     oled.println(code);
+    
+    // Mostrar estado WiFi
+    oled.setTextSize(1);
+    oled.setCursor(100, 0);
+    oled.println(wifiConnected ? "ON" : "OFF");
 
     oled.display();
   }
