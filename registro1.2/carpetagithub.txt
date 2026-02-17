@@ -1,0 +1,4 @@
+>git clone --filter=blob:none --no-checkout https://github.com/JayFB56/Proyecto_Ganadero.git                                                                                                              >cd Proyecto_Ganadero
+>git sparse-checkout init --cone
+>git sparse-checkout set lechefacil-demo-registros
+>git checkout  
